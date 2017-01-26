@@ -97,11 +97,11 @@ class Query implements \UniMapper\Adapter\IQuery
 
         // Join relations & includes
         if ($this->includes) {
-            $this->parameters["detail"] = "full";
+        //    $this->parameters["detail"] = "full";
             $this->parameters["includes"] = implode(",", $this->includes);
         }
         if ($this->relations) {
-            $this->parameters["detail"] = "full";
+       //     $this->parameters["detail"] = "full";
             $this->parameters["relations"] = implode(",", $this->relations);
         }
 

@@ -4,6 +4,9 @@ namespace UniMapper\Flexibee;
 
 use UniMapper\Association;
 use UniMapper\Adapter\IQuery;
+use UniMapper\Entity\Reflection;
+use UniMapper\Entity\Reflection\Property;
+use UniMapper\Query\Selectable;
 
 class Adapter extends \UniMapper\Adapter
 {
@@ -157,10 +160,16 @@ class Adapter extends \UniMapper\Adapter
         return $query;
     }
 
-    public function createSelectOne($evidence, $column, $primaryValue)
+    public function createSelectOne($evidence, $column, $primaryValue, $selection = [])
     {
         $query = new Query($evidence);
         $query->id = $primaryValue;
+
+
+        if ($selection) {
+            $selection = array_unique(self::_escapeSelection($selection));
+            $query->parameters["detail"] = "custom:" . implode(",", $selection);
+        }
 
         $query->resultCallback = function ($result, Query $query) {
 
@@ -243,7 +252,7 @@ class Adapter extends \UniMapper\Adapter
         }
 
         if ($selection) {
-            $query->parameters["detail"] = "custom:" . implode(",", $this->_escapeSelection($selection));
+            $query->parameters["detail"] = "custom:" . implode(",", self::_escapeSelection($selection));
         }
 
         $query->resultCallback = function ($result, Query $query) {
@@ -310,6 +319,7 @@ class Adapter extends \UniMapper\Adapter
     {
         $query = new Query($evidence);
         $query->parameters["detail"] = "id";
+        $query->parameters["limit"] = 1;
         $query->parameters["add-row-count"] = "true";
         $query->resultCallback = function ($result) {
             return $result->{"@rowCount"};
@@ -450,22 +460,41 @@ class Adapter extends \UniMapper\Adapter
      *
      * @return array
      */
-    private function _escapeSelection(array $properties)
+    public static function _escapeSelection(array $properties)
     {
+        $selection = [];
         foreach ($properties as $index => $item) {
-
-            if ($this->_endsWith($item, "@removeAll")) {
-                $properties[$index] = substr($item, 0, -10);
-            } elseif ($this->_endsWith($item, "@showAs") || $this->_endsWith($item, "@action")) {
-                $properties[$index] = substr($item, 0, -7);
-            } elseif ($this->_endsWith($item, "@ref")) {
-                $properties[$index] = substr($item, 0, -4);
+            if (is_array($item)) {
+                foreach ($item as $k => $v) {
+                    if (is_string($k)) {
+                        $selection[] = $k . '(' . implode(',', self::_escapeSelection($v)) . ')';
+                    } else {
+                        $selection[] = self::escapeSelectionProperty($v);
+                    }
+                }
+            } else {
+                $selection[] = self::escapeSelectionProperty($item);
             }
         }
-        return $properties;
+        return array_unique($selection);
     }
 
-    private function _endsWith($haystack, $needle)
+    public static function escapeSelectionProperty($item)
+    {
+        if (self::_endsWith($item, "@removeAll")) {
+            return substr($item, 0, -10);
+        } elseif (self::_endsWith($item, "@showAs") || self::_endsWith($item, "@action")) {
+            return substr($item, 0, -7);
+        } elseif (self::_endsWith($item, "@ref")) {
+            return substr($item, 0, -4);
+        } elseif (self::_endsWith($item, "@encoding")) {
+            return substr($item, 0, -9);
+        }
+
+        return $item;
+    }
+
+    public static function _endsWith($haystack, $needle)
     {
         return $needle === "" || substr($haystack, -strlen($needle)) === $needle;
     }
@@ -580,4 +609,116 @@ class Adapter extends \UniMapper\Adapter
         return $data;
     }
 
+    /**
+     * @param \UniMapper\Query|Selectable $query
+     *
+     * @return array
+     */
+    public function createSelection(\UniMapper\Query $query)
+    {
+        $selection = parent::createSelection($query);
+        $selection = self::mergeArrays($selection, $this->traverseEntityForSelection($query->getEntityReflection()));
+        foreach ($query->getLocalAssociations() as $association) {
+            $targetSelection = $association->getTargetSelection();
+            if ($targetSelection) {
+                $assocSelection = [];
+                foreach ($targetSelection as $propertyName) {
+                    $property = $query->getEntityReflection()->getProperty($propertyName);
+                    $assocSelection[$property->getName()] = $property->getName(true);
+                }
+            } else {
+                $assocSelection = $this->traverseEntityForPropertySelection($association->getTargetReflection());
+            }
+
+            $mapBy = $association->getMapBy();
+            $relationTypeColumn = $mapBy[0] === 'uzivatelske-vazby' ? 'vazbaTyp' : 'typVazbyK';
+            $selection = self::mergeArrays(
+                $selection,
+                [
+                    $mapBy[0] => [ // uzivatelske-vazby
+                        $mapBy[0] => [ // uzivatelske-vazby
+                            $relationTypeColumn => $relationTypeColumn, // typVazbyK or vazbaTyp
+                            $mapBy[2] => [$mapBy[2] => $assocSelection] // object => [object => ['id','kod',...]]
+                        ]
+                    ]
+                ]
+            );
+        }
+        return $selection;
+    }
+    protected function traverseEntityForPropertySelection(Reflection $entityReflection)
+    {
+        $selection = [];
+        foreach ($entityReflection->getProperties() as $property) {
+            // Exclude associations & computed properties
+            if (!$property->hasOption(Reflection\Property::OPTION_ASSOC)
+                && !$property->hasOption(Reflection\Property::OPTION_COMPUTED)
+            ) {
+                if ($property->getType() !== \UniMapper\Entity\Reflection\Property::TYPE_COLLECTION
+                    && $property->getType() !== \UniMapper\Entity\Reflection\Property::TYPE_ENTITY
+                ) {
+                    $selection[$property->getName()] = $property->getName(true);
+                } else if ($property->getType() === \UniMapper\Entity\Reflection\Property::TYPE_COLLECTION) {
+                    $propertyEntityReflection = Reflection::load($property->getTypeOption());
+                    $selection[$property->getName()] = [
+                        $property->getName(true) => $this->traverseEntityForPropertySelection($propertyEntityReflection)
+                    ];
+                }
+            }
+        }
+        return $selection;
+    }
+
+    protected function traverseEntityForSelection(Reflection $entityReflection)
+    {
+        $selection = [];
+        foreach ($entityReflection->getProperties() as $property) {
+            if (/*($property->getType() === \UniMapper\Entity\Reflection\Property::TYPE_ENTITY)
+                ||*/ ($property->getType() === \UniMapper\Entity\Reflection\Property::TYPE_COLLECTION)
+            ) {
+
+                // Exclude associations & computed properties
+                if (!$property->hasOption(Property::OPTION_ASSOC)
+                    && !$property->hasOption(Property::OPTION_COMPUTED)
+                ) {
+                    $propertyEntityReflection = Reflection::load($property->getTypeOption());
+                    $selection[$property->getName()] = [
+                        $property->getName(true) => $this->traverseEntityForPropertySelection($propertyEntityReflection)
+                    ];
+                }
+            }
+        }
+        return $selection;
+    }
+
+    /**
+     * Recursively appends elements of remaining keys from the second array to the first.
+     * @return array
+     */
+    public static function mergeArrays($arr1, $arr2)
+    {
+        $arrays = func_get_args();
+        $result = array();
+
+        foreach ($arrays as $array) {
+            foreach ($array as $key => $value) {
+                // Renumber integer keys as array_merge_recursive() does. Note that PHP
+                // automatically converts array keys that are integer strings (e.g., '1')
+                // to integers.
+                if (is_integer($key)) {
+                    $result[] = $value;
+                }
+                // Recurse when both values are arrays.
+                elseif (isset($result[$key]) && is_array($result[$key]) && is_array($value)) {
+                    $result[$key] = self::mergeArrays($result[$key], $value);
+                }
+                // Otherwise, use the latter value, overriding any previous value.
+                else {
+                    $result[$key] = $value;
+                }
+            }
+        }
+
+        return $result;
+    }
 }
