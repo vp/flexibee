@@ -50,24 +50,22 @@ class Mapping extends \UniMapper\Adapter\Mapping
      * @param \UniMapper\Entity\Reflection $reflection   Entity reflection
      * @param array                        $selection    Selection array
      * @param \UniMapper\Association[]     $associations Optional associations
+     * @param \UniMapper\Mapper            $mapper       Mapper instance
      *
      * @return array
      */
-    public function unmapSelection(Reflection $reflection, array $selection, array $associations = [])
+    public function unmapSelection(Reflection $reflection, array $selection, array $associations = [], \UniMapper\Mapper $mapper)
     {
-        $selection = \UniMapper\Flexibee\Adapter::mergeArrays($selection, $this->traverseEntityForSelection($reflection, $selection));
-        if ($associations) {
+       if ($associations) {
+            // handle local associations
             foreach ($associations as $association) {
                 $targetSelection = $association->getTargetSelection();
-                if ($targetSelection) {
-                    $assocSelection = [];
-                    foreach ($targetSelection as $propertyName) {
-                        $property = $reflection->getProperty($propertyName);
-                        $assocSelection[$property->getName()] = $property->getName(true);
-                    }
-                } else {
-                    $assocSelection = $this->traverseEntityForPropertySelection($association->getTargetReflection());
+                $targetReflection = $association->getTargetReflection();
+                if (!$targetSelection) {
+                    $targetSelection = \UniMapper\Entity\Selection::generateEntitySelection($targetReflection);
                 }
+                $targetSelection = \UniMapper\Entity\Selection::normalizeEntitySelection($targetReflection, $targetSelection);
+                $assocSelection = $mapper->unmapSelection($targetReflection, $targetSelection);
 
                 $mapBy = $association->getMapBy();
                 $relationTypeColumn = $mapBy[0] === 'uzivatelske-vazby' ? 'vazbaTyp' : 'typVazbyK';
@@ -84,53 +82,7 @@ class Mapping extends \UniMapper\Adapter\Mapping
                 );
             }
         }
-        return $selection;
-    }
 
-    protected function traverseEntityForPropertySelection(Reflection $entityReflection)
-    {
-        $selection = [];
-        foreach ($entityReflection->getProperties() as $property) {
-            // Exclude associations & computed properties
-            if (!$property->hasOption(Reflection\Property::OPTION_ASSOC)
-                && !$property->hasOption(Reflection\Property::OPTION_COMPUTED)
-            ) {
-                if ($property->getType() !== \UniMapper\Entity\Reflection\Property::TYPE_COLLECTION
-                    && $property->getType() !== \UniMapper\Entity\Reflection\Property::TYPE_ENTITY
-                ) {
-                    $selection[$property->getName()] = $property->getName(true);
-                } else if ($property->getType() === \UniMapper\Entity\Reflection\Property::TYPE_COLLECTION) {
-                    $propertyEntityReflection = Reflection::load($property->getTypeOption());
-                    $selection[$property->getName()] = [
-                        $property->getName(true) => $this->traverseEntityForPropertySelection($propertyEntityReflection)
-                    ];
-                }
-            }
-        }
-        return $selection;
-    }
-
-    protected function traverseEntityForSelection(Reflection $entityReflection, $mainSelection = [])
-    {
-        $selection = [];
-        foreach ($entityReflection->getProperties() as $property) {
-            if (/*($property->getType() === \UniMapper\Entity\Reflection\Property::TYPE_ENTITY)
-                ||*/
-            ($property->getType() === \UniMapper\Entity\Reflection\Property::TYPE_COLLECTION)
-            ) {
-                if (!$mainSelection || in_array($property->getName(), $mainSelection) !== false) {
-                    // Exclude associations & computed properties
-                    if (!$property->hasOption(Property::OPTION_ASSOC)
-                        && !$property->hasOption(Property::OPTION_COMPUTED)
-                    ) {
-                        $propertyEntityReflection = Reflection::load($property->getTypeOption());
-                        $selection[$property->getName()] = [
-                            $property->getName(true) => $this->traverseEntityForPropertySelection($propertyEntityReflection)
-                        ];
-                    }
-                }
-            }
-        }
         return $selection;
     }
 
