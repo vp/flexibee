@@ -23,11 +23,25 @@ class Query implements \UniMapper\Adapter\IQuery
     public $includes = [];
     public $relations = [];
 
+    /** @var bool  */
+    private $detailFullOnAssociations = true;
+
     public function __construct($evidence, $method = self::GET, array $data = [])
     {
         $this->evidence = $evidence;
         $this->method = $method;
         $this->data = $data;
+    }
+
+    /**
+     * If set to true detail=full will be used
+     * when associations or relations present in query
+     *
+     * @param bool $value
+     */
+    public function setDetailFullOnAssociations($value)
+    {
+        $this->detailFullOnAssociations = $value;
     }
 
     public function setFilter(array $filter)
@@ -97,11 +111,15 @@ class Query implements \UniMapper\Adapter\IQuery
 
         // Join relations & includes
         if ($this->includes) {
-        //    $this->parameters["detail"] = "full";
+            if ($this->detailFullOnAssociations) {
+                $this->parameters["detail"] = "full";
+            }
             $this->parameters["includes"] = implode(",", $this->includes);
         }
         if ($this->relations) {
-       //     $this->parameters["detail"] = "full";
+            if ($this->detailFullOnAssociations) {
+                $this->parameters["detail"] = "full";
+            }
             $this->parameters["relations"] = implode(",", $this->relations);
         }
 

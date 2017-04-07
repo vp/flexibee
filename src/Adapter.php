@@ -38,6 +38,20 @@ class Adapter extends \UniMapper\Adapter
     /** @var string */
     private $authUser;
 
+    /** @var bool  */
+    private $detailFullOnAssociations = true;
+
+    /**
+     * If set to true detail=full will be used
+     * when associations or relations present in query
+     *
+     * @param bool $value
+     */
+    public function setDetailFullOnAssociations($value)
+    {
+        $this->detailFullOnAssociations = $value;
+    }
+
     public function __construct(array $config)
     {
         parent::__construct(new Adapter\Mapping);
@@ -163,6 +177,7 @@ class Adapter extends \UniMapper\Adapter
     public function createSelectOne($evidence, $column, $primaryValue, $selection = [])
     {
         $query = new Query($evidence);
+        $query->setDetailFullOnAssociations($this->detailFullOnAssociations);
         $query->id = $primaryValue;
 
 
@@ -236,7 +251,7 @@ class Adapter extends \UniMapper\Adapter
     public function createSelect($evidence, array $selection = [], array $orderBy = [], $limit = 0, $offset = 0)
     {
         $query = new Query($evidence);
-
+        $query->setDetailFullOnAssociations($this->detailFullOnAssociations);
         $query->parameters["start"] = (int) $offset;
         $query->parameters["limit"] = (int) $limit;
 
