@@ -624,34 +624,4 @@ class Adapter extends \UniMapper\Adapter
         return $data;
     }
 
-    /**
-     * Recursively appends elements of remaining keys from the second array to the first.
-     * @return array
-     */
-    public static function mergeArrays($arr1, $arr2)
-    {
-        $arrays = func_get_args();
-        $result = array();
-
-        foreach ($arrays as $array) {
-            foreach ($array as $key => $value) {
-                // Renumber integer keys as array_merge_recursive() does. Note that PHP
-                // automatically converts array keys that are integer strings (e.g., '1')
-                // to integers.
-                if (is_integer($key)) {
-                    $result[] = $value;
-                }
-                // Recurse when both values are arrays.
-                elseif (isset($result[$key]) && is_array($result[$key]) && is_array($value)) {
-                    $result[$key] = self::mergeArrays($result[$key], $value);
-                }
-                // Otherwise, use the latter value, overriding any previous value.
-                else {
-                    $result[$key] = $value;
-                }
-            }
-        }
-
-        return $result;
-    }
 }

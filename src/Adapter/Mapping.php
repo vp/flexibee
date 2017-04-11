@@ -69,7 +69,7 @@ class Mapping extends \UniMapper\Adapter\Mapping
 
                 $mapBy = $association->getMapBy();
                 $relationTypeColumn = $mapBy[0] === 'uzivatelske-vazby' ? 'vazbaTyp' : 'typVazbyK';
-                $selection = \UniMapper\Flexibee\Adapter::mergeArrays(
+                $selection = \UniMapper\Entity\Selection::mergeArrays(
                     $selection,
                     [
                         $mapBy[0] => [ // uzivatelske-vazby
