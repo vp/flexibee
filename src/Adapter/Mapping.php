@@ -58,26 +58,40 @@ class Mapping extends \UniMapper\Adapter\Mapping
     {
        if ($associations) {
             // handle local associations
-            foreach ($associations as $association) {
-                $targetSelection = $association->getTargetSelection();
-                $targetReflection = $association->getTargetReflection();
-                if (!$targetSelection) {
-                    $targetSelection = \UniMapper\Entity\Selection::generateEntitySelection($targetReflection);
-                }
-                $targetSelection = \UniMapper\Entity\Selection::normalizeEntitySelection($targetReflection, $targetSelection);
-                $assocSelection = $mapper->unmapSelection($targetReflection, $targetSelection);
+            foreach ($associations['local'] as $association) {
+                $assocSelection = $association->getTargetSelectionUnampped();
 
-                $mapBy = $association->getMapBy();
-                $relationTypeColumn = $mapBy[0] === 'uzivatelske-vazby' ? 'vazbaTyp' : 'typVazbyK';
+                if ($association instanceof Association\ManyToMany) {
+                    // M:N
+                    $joinKey = $association->getJoinKey();
+                    $refKey = $association->getReferencingKey();
+                    $relationTypeColumn = $joinKey === 'uzivatelske-vazby' ? 'vazbaTyp' : 'typVazbyK';
+                    $selection = \UniMapper\Entity\Selection::mergeArrays(
+                        $selection,
+                        [
+                            $joinKey => [ // uzivatelske-vazby
+                                $joinKey => [ // uzivatelske-vazby
+                                    $relationTypeColumn => $relationTypeColumn, // typVazbyK or vazbaTyp
+                                    $refKey => [$refKey => $assocSelection] // object => [object => ['id','kod',...]]
+                                ]
+                            ]
+                        ]
+                    );
+                    continue;
+
+                } elseif ($association instanceof Association\OneToMany) {
+                    // 1:N
+                    $refKey = $association->getReferencedKey();
+                } else {
+                    // N:1
+                    // 1:1
+                    $refKey = $association->getReferencingKey();
+                }
+
                 $selection = \UniMapper\Entity\Selection::mergeArrays(
                     $selection,
                     [
-                        $mapBy[0] => [ // uzivatelske-vazby
-                            $mapBy[0] => [ // uzivatelske-vazby
-                                $relationTypeColumn => $relationTypeColumn, // typVazbyK or vazbaTyp
-                                $mapBy[2] => [$mapBy[2] => $assocSelection] // object => [object => ['id','kod',...]]
-                            ]
-                        ]
+                        $refKey => [$refKey => $assocSelection]
                     ]
                 );
             }
