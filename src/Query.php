@@ -109,15 +109,21 @@ class Query implements \UniMapper\Adapter\IQuery
 
         $url .= ".json";
 
+        $detailFullOnAssociations = $this->detailFullOnAssociations;
+        //- HACK FIX on bug in flexibee "cenHladiny" association
+        if ($this->evidence === 'adresar' && in_array('cenHladiny', $this->relations)) {
+            $detailFullOnAssociations = true;
+        }
+
         // Join relations & includes
         if ($this->includes) {
-            if ($this->detailFullOnAssociations) {
+            if ($detailFullOnAssociations) {
                 $this->parameters["detail"] = "full";
             }
             $this->parameters["includes"] = implode(",", $this->includes);
         }
         if ($this->relations) {
-            if ($this->detailFullOnAssociations) {
+            if ($detailFullOnAssociations) {
                 $this->parameters["detail"] = "full";
             }
             $this->parameters["relations"] = implode(",", $this->relations);

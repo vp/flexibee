@@ -318,7 +318,9 @@ class Adapter extends \UniMapper\Adapter
                         $result[$index]->{$propertyName} = $item->{$association->getReferencingKey()};
                     } elseif ($association instanceof Association\OneToMany) {
                         // 1:N
-
+                        if (!isset($item->{$association->getReferencedKey()})) {
+                            throw new \UniMapper\Exception\QueryException('Undefined referenced key: ' . $association->getReferencedKey());
+                        }
                         $result[$index]->{$propertyName} = $item->{$association->getReferencedKey()};
                     }
                 }
