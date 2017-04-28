@@ -130,7 +130,7 @@ class Query implements \UniMapper\Adapter\IQuery
         }
 
         if ($this->parameters) {
-            $url .= "?" . http_build_query($this->parameters);
+            $url .= "?" . urldecode(http_build_query($this->parameters)); // parameters are generated and validated, so dont worry and dont send big (encoded) params
         }
 
         return $url;

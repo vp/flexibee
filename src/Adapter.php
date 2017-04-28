@@ -141,9 +141,10 @@ class Adapter extends \UniMapper\Adapter
         if (curl_getinfo($ch, CURLINFO_HTTP_CODE) !== 200
             && curl_getinfo($ch, CURLINFO_HTTP_CODE) !== 201
         ) {
+            $info = curl_getinfo($ch);
             throw new Exception\AdapterException(
-                "An unknown Flexibee error occurred!",
-                curl_getinfo($ch),
+                "An unknown Flexibee error occurred! HTTP CODE: " . $info['http_code'],
+                $info,
                 $response
             );
         }
