@@ -58,13 +58,14 @@ class Mapping extends \UniMapper\Adapter\Mapping
     {
        if ($associations) {
             // handle local associations
+           /** @var \UniMapper\Association $association */
             foreach ($associations['local'] as $association) {
                 $assocSelection = $association->getTargetSelectionUnampped();
 
                 if ($association instanceof Association\ManyToMany) {
                     // M:N
-                    $joinKey = $association->getJoinKey();
-                    $refKey = $association->getReferencingKey();
+                    $joinKey = $association->getJoinReferencingKey();
+                    $refKey = $association->getJoinReferencedKey();
                     $relationTypeColumn = $joinKey === 'uzivatelske-vazby' ? 'vazbaTyp' : 'typVazbyK';
                     $selection = \UniMapper\Entity\Selection::mergeArrays(
                         $selection,

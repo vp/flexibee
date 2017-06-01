@@ -19,6 +19,7 @@ class Query implements \UniMapper\Adapter\IQuery
     public $method;
     public $parameters = [];
     public $resultCallback;
+    /** @var Association[] */
     public $associations = [];
     public $includes = [];
     public $relations = [];
@@ -56,11 +57,11 @@ class Query implements \UniMapper\Adapter\IQuery
             if ($association instanceof Association\ManyToMany) {
                 // M:N
 
-                if ($association->getJoinKey() === "vazby") {
+                if ($association->getJoinReferencingKey() === "vazby") {
 
                     $this->relations[] = "vazby";
                     $this->includes[] = "/winstrom/" . $this->evidence . "/vazby/vazba/" . $association->getReferencingKey();
-                } elseif ($association->getJoinKey() === "uzivatelske-vazby") {
+                } elseif ($association->getJoinReferencingKey() === "uzivatelske-vazby") {
 
                     $this->relations[] = "uzivatelske-vazby";
                     $this->includes[] = "/winstrom/" . $this->evidence . "/uzivatelske-vazby/uzivatelska-vazba/object";

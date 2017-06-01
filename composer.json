@@ -18,7 +18,7 @@
         "ext-curl": "*"
     },
     "require-dev": {
-        "unimapper/unimapper": "dev-vp-true-selection as 1.2.x-dev",
+        "unimapper/unimapper": "dev-vp-associations as 1.2.x-dev",
         "nette/tester": "~1.0",
         "mockery/mockery": "~0.9.0",
         "squizlabs/php_codesniffer": "~2.0"

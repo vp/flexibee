@@ -175,6 +175,51 @@ class Adapter extends \UniMapper\Adapter
         return $query;
     }
 
+    protected function associate(Association $association, $item)
+    {
+        $associated = null;
+
+        if ($association instanceof Association\ManyToMany) {
+            // M:N
+
+            $associated = [];
+
+            if ($association->getJoinReferencingKey() === "vazby") {
+
+                $joinResources = explode(',', $association->getJoinResource());
+                foreach ($item->vazby as $relation) {
+                    foreach ($joinResources as $joinResource) {
+                        if ($relation->typVazbyK === $joinResource) { // eg. typVazbyDokl.obchod_zaloha_hla
+                            $associated[] = $relation->{$association->getJoinReferencedKey()}[0];// 'a' or 'b'
+                        }
+                    }
+                }
+            } elseif ($association->getJoinReferencingKey() === "uzivatelske-vazby") {
+
+                foreach ($item->{"uzivatelske-vazby"} as $relation) {
+
+                    if ($relation->vazbaTyp === $association->getJoinResource()) { // eg. 'code:MY_CUSTOM_ID'
+                        $associated[] = $relation->object[0];
+                    }
+                }
+            }
+        } elseif ($association instanceof Association\OneToOne) {
+            // 1:1
+
+            $associated = $item->{$association->getReferencingKey()};
+        } elseif ($association instanceof Association\ManyToOne) {
+            // N:1
+
+            $associated = $item->{$association->getReferencingKey()};
+        } elseif ($association instanceof Association\OneToMany) {
+            // 1:N
+
+            $associated = $item->{$association->getReferencedKey()};
+        }
+
+        return $associated;
+    }
+
     public function createSelectOne($evidence, $column, $primaryValue, $selection = [])
     {
         $query = new Query($evidence);
@@ -202,44 +247,7 @@ class Adapter extends \UniMapper\Adapter
             foreach ($result as $index => $item) {
 
                 foreach ($query->associations as $association) {
-
-                    if ($association instanceof Association\ManyToMany) {
-                        // M:N
-
-                        $result[$index]->{$association->getPropertyName()} = [];
-
-                        if ($association->getJoinKey() === "vazby") {
-
-                            $joinResources = explode(',', $association->getJoinResource());
-                            foreach ($item->vazby as $relation) {
-                                foreach ($joinResources as $joinResource) {
-                                    if ($relation->typVazbyK === $joinResource) { // eg. typVazbyDokl.obchod_zaloha_hla
-                                        $result[$index]->{$association->getPropertyName()}[] = $relation->{$association->getReferencingKey()}[0];// 'a' or 'b'
-                                    }
-                                }
-                            }
-                        } elseif ($association->getJoinKey() === "uzivatelske-vazby") {
-
-                            foreach ($item->{"uzivatelske-vazby"} as $relation) {
-
-                                if ($relation->vazbaTyp === $association->getJoinResource()) { // eg. 'code:MY_CUSTOM_ID'
-                                    $result[$index]->{$association->getPropertyName()}[] = $relation->object[0];
-                                }
-                            }
-                        }
-                    } elseif ($association instanceof Association\OneToOne) {
-                        // 1:1
-
-                        $result[$index]->{$association->getPropertyName()} = $item->{$association->getReferencingKey()};
-                    } elseif ($association instanceof Association\ManyToOne ) {
-                        // N:1
-
-                        $result[$index]->{$association->getPropertyName()} = $item->{$association->getReferencingKey()};
-                    } elseif ($association instanceof Association\OneToMany) {
-                        // 1:N
-
-                        $result[$index]->{$association->getPropertyName()} = $item->{$association->getReferencedKey()};
-                    }
+                    $result[$index]->{$association->getPropertyName()} = $this->associate($association, $item);
                 }
             }
 
@@ -273,6 +281,10 @@ class Adapter extends \UniMapper\Adapter
 
         $query->resultCallback = function ($result, Query $query) {
 
+            if ($result === false) {
+                return $result;
+            }
+
             $result = $result->{$query->evidence};
             if (count($result) === 0) {
                 return false;
@@ -283,47 +295,7 @@ class Adapter extends \UniMapper\Adapter
 
                 foreach ($query->associations as $association) {
 
-                    $propertyName = $association->getPropertyName();
-
-                    if ($association instanceof Association\ManyToMany) {
-                        // M:N
-
-                        $result[$index]->{$propertyName} = [];
-
-                        if ($association->getJoinKey() === "vazby") {
-
-                            $joinResources = explode(',', $association->getJoinResource());
-                            foreach ($item->vazby as $relation) {
-                                foreach ($joinResources as $joinResource) {
-                                    if ($relation->typVazbyK === $joinResource) { // eg. typVazbyDokl.obchod_zaloha_hla
-                                        $result[$index]->{$propertyName}[] = $relation->{$association->getReferencingKey()}[0];// 'a' or 'b'
-                                    }
-                                }
-                            }
-                        } elseif ($association->getJoinKey() === "uzivatelske-vazby") {
-
-                            foreach ($item->{"uzivatelske-vazby"} as $relation) {
-
-                                if ($relation->vazbaTyp === $association->getJoinResource()) { // eg. 'code:MY_CUSTOM_ID'
-                                    $result[$index]->{$propertyName}[] = $relation->object[0];
-                                }
-                            }
-                        }
-                    } elseif ($association instanceof Association\OneToOne) {
-                        // 1:1
-
-                        $result[$index]->{$propertyName} = $item->{$association->getReferencingKey()};
-                    } elseif ($association instanceof Association\ManyToOne) {
-                        // N:1
-
-                        $result[$index]->{$propertyName} = $item->{$association->getReferencingKey()};
-                    } elseif ($association instanceof Association\OneToMany) {
-                        // 1:N
-                        if (!isset($item->{$association->getReferencedKey()})) {
-                            throw new \UniMapper\Exception\QueryException('Undefined referenced key: ' . $association->getReferencedKey());
-                        }
-                        $result[$index]->{$propertyName} = $item->{$association->getReferencedKey()};
-                    }
+                    $result[$index]->{$association->getPropertyName()} = $this->associate($association, $item);
                 }
             }
 
@@ -347,7 +319,7 @@ class Adapter extends \UniMapper\Adapter
 
     public function createModifyManyToMany(Association\ManyToMany $association, $primaryValue, array $refKeys, $action = self::ASSOC_ADD)
     {
-        if ($association->getJoinKey() !== "uzivatelske-vazby") {
+        if ($association->getJoinReferencingKey() !== "uzivatelske-vazby") {
             throw new \Exception("Only custom relations can be modified!");
         }
 
