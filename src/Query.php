@@ -2,8 +2,10 @@
 
 namespace UniMapper\Flexibee;
 
+use InvalidArgumentException;
 use UniMapper\Association;
 use UniMapper\Entity\Filter;
+use UniMapper\Entity\Reflection\Property\Option\Assoc;
 
 class Query implements \UniMapper\Adapter\IQuery
 {
@@ -51,42 +53,64 @@ class Query implements \UniMapper\Adapter\IQuery
 
     public function setAssociations(array $associations)
     {
-        foreach ($associations as $association) {
-
-            if ($association instanceof Association\ManyToMany) {
-                // M:N
-
-                if ($association->getJoinKey() === "vazby") {
-
-                    $this->relations[] = "vazby";
-                    $this->includes[] = "/winstrom/" . $this->evidence . "/vazby/vazba/" . $association->getReferencingKey();
-                } elseif ($association->getJoinKey() === "uzivatelske-vazby") {
-
-                    $this->relations[] = "uzivatelske-vazby";
-                    $this->includes[] = "/winstrom/" . $this->evidence . "/uzivatelske-vazby/uzivatelska-vazba/object";
-                } else {
-                    throw new \Exception("Unexpected association key on M:N!");
-                }
-            } elseif ($association instanceof Association\ManyToOne) {
-                // N:1
-
-                $this->includes[] = "/" . $this->evidence . "/" . $association->getReferencingKey();
-                $this->relations[] = $association->getReferencingKey(); // Due to attachments
-            } elseif ($association instanceof Association\OneToOne) {
-                // 1:1
-
-                $this->includes[] = "/" . $this->evidence . "/" . $association->getReferencingKey();
-                $this->relations[] = $association->getReferencingKey(); // Due to attachments
-            } elseif ($association instanceof Association\OneToMany) {
-                // 1:N
-
-                $this->relations[] = $association->getReferencedKey();
-            } else {
-                throw new \Exception("Unsupported association " . get_class($association) . "!");
+        foreach ($associations as $propertyName => $association) {
+            switch ($association->getType()) {
+                case "m:n":
+                case "m>n":
+                case "m<n":
+                    $this->_manyToMany($association);
+                    break;
+                case "1:n":
+                    $this->_oneToMany($association);
+                    break;
+                case "1:1":
+                case "n:1":
+                    $this->_manyOrOneToOne($association);
+                    break;
+                default:
+                    throw new InvalidArgumentException(
+                        "Unsupported association " . $association->getType() . "!",
+                        $association
+                    );
             }
-            $this->associations[] = $association;
+        }
+
+        $this->associations = $associations;
+    }
+
+    private function _oneToMany(Assoc $association)
+    {
+        list($referencedKey) = $association->getBy();
+
+        $this->relations[] = $referencedKey;
+    }
+
+    private function _manyOrOneToOne(Assoc $association)
+    {
+        list($referencingKey) = $association->getBy();
+
+        $this->includes[] = "/" . $this->evidence . "/" . $referencingKey;
+        $this->relations[] = $referencingKey; // Due to attachments
+    }
+
+
+    private function _manyToMany(Assoc $association)
+    {
+        list($joinKey, $joinResource, $referencingKey) = $association->getBy();
+
+        if ($joinKey === "vazby") {
+
+            $this->relations[] = "vazby";
+            $this->includes[] = "/winstrom/" . $this->evidence . "/vazby/vazba/" . $referencingKey;
+        } elseif ($joinKey === "uzivatelske-vazby") {
+
+            $this->relations[] = "uzivatelske-vazby";
+            $this->includes[] = "/winstrom/" . $this->evidence . "/uzivatelske-vazby/uzivatelska-vazba/object";
+        } else {
+            throw new \Exception("Unexpected association key on M:N!");
         }
     }
+
 
     public function getRaw()
     {
