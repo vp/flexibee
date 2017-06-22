@@ -51,8 +51,12 @@ class Query implements \UniMapper\Adapter\IQuery
         $this->filter = $this->_formatFilter($filter);
     }
 
-    public function setAssociations(array $associations)
+    public function setAssociations(array $associations, array $associationsFilters = [])
     {
+        if ($associationsFilters) {
+            throw new \UniMapper\Exception\QueryException('Association filters on local flexibee association not supported!');
+        }
+
         foreach ($associations as $propertyName => $association) {
             switch ($association->getType()) {
                 case "m:n":
