@@ -300,7 +300,11 @@ class Adapter extends \UniMapper\Adapter
             throw new \UniMapper\Exception\QueryException('Undefined referencing key: ' . $referencingKey);
         }
 
-        return $item->{$referencingKey};
+        $associated = $item->{$referencingKey};
+
+        return is_array($associated) && isset($associated[0]) // is flexibee returned associated as array
+            ? $associated[0] // if true return first in array
+            : $associated; // seems to be values itself
     }
 
     private function _manyToMany(Assoc $association, $propertyName, $item)
@@ -622,7 +626,7 @@ class Adapter extends \UniMapper\Adapter
             ];
         }
 
-        $query = $this->createInsert(
+        $query = $this->createUpdate(
             $sourceResource,
             $values
         );
