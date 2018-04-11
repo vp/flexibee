@@ -31,7 +31,7 @@ class Mapping extends \UniMapper\Adapter\Mapping
     {
         if ($value === null) {
             return "";
-        } elseif ($value instanceof \DateTime
+        } elseif ($value instanceof \DateTimeInterface
             && isset(self::$format[$property->getType()])
         ) {
 
