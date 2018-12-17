@@ -181,9 +181,11 @@ class Query implements \UniMapper\Adapter\IQuery
         } else {
             // Filter item
 
-            foreach ($filter as $name => $item) {
+            foreach ($filter as $itemName => $item) {
 
                 foreach ($item as $modifier => $value) {
+                    //- because unsets below
+                    $name = $itemName;
 
                     if ($name === "stitky") {
                         $value = explode(",", $value);
