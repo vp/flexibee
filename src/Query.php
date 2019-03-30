@@ -305,4 +305,9 @@ class Query implements \UniMapper\Adapter\IQuery
         }
     }
 
+    public function addOption($name, $value)
+    {
+        $this->parameters[$name] = $value;
+    }
+
 }

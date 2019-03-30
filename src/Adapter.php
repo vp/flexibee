@@ -249,6 +249,15 @@ class Adapter extends \UniMapper\Adapter
                 foreach ($query->associations as $propertyName => $association) {
                     $result[$index]->{$propertyName} = $this->associate($association, $propertyName, $item);
                 }
+                if (isset($query->parameters['extAsId']) && isset($item->{'external-ids'}) && $item->{'external-ids'}) {
+                    $extPrefixLength = strlen($query->parameters['extAsId']);
+                    $matching = array_filter($item->{'external-ids'}, function ($extId) use ($extPrefixLength, $query) {
+                       return substr($extId, 0, $extPrefixLength) === $query->parameters['extAsId'];
+                    });
+                    if ($matching) {
+                        $item->id = $matching[0];
+                    }
+                }
             }
 
             return $result;
